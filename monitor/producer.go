@@ -85,6 +85,8 @@ func (ms *MockServer) WithAccessLog() http.Handler {
 			IP:           r.RemoteAddr,
 			ResponseTime: float64(time.Since(started)) / float64(time.Second),
 			At:           time.Now().String(),
+			At2:          "!!!",
+			At3:          "@@@",
 			TraceNo:      traceNo.String(),
 			Message:      RandString(ms.Conf.MaxKafkaMsgLen),
 		}
