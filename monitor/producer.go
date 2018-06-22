@@ -68,6 +68,8 @@ func (ms *MockServer) WithAccessLog() http.Handler {
 
 		sp.LogKV("message", RandString(ms.Conf.MaxTracingMsgLen))
 		sp.LogKV("client_send", "test")
+		sp.LogKV("at", started.String())
+
 		if ms.Conf.RequestURL != "" {
 			_, err := ms.NewCliReq(sp)
 			if err != nil {
@@ -82,6 +84,7 @@ func (ms *MockServer) WithAccessLog() http.Handler {
 			Path:         r.RequestURI,
 			IP:           r.RemoteAddr,
 			ResponseTime: float64(time.Since(started)) / float64(time.Second),
+			At:           time.Now().String(),
 			TraceNo:      traceNo.String(),
 			Message:      RandString(ms.Conf.MaxKafkaMsgLen),
 		}
@@ -103,8 +106,8 @@ func NewAccessLogProducer(brokers []string, n int) sarama.AsyncProducer {
 	// For the access log, we are looking for AP semantics, with high throughput.
 	// By creating batches of compressed messages, we reduce network I/O at a cost of more latency.
 	c := sarama.NewConfig()
-	c.Producer.RequiredAcks = sarama.WaitForLocal       // Only wait for the leader to ack
-	c.Producer.Compression = sarama.CompressionSnappy   // Compress messages
+	c.Producer.RequiredAcks = sarama.WaitForLocal                    // Only wait for the leader to ack
+	c.Producer.Compression = sarama.CompressionSnappy                // Compress messages
 	c.Producer.Flush.Frequency = time.Duration(n) * time.Millisecond // Flush batches every 500ms
 
 	producer, err := sarama.NewAsyncProducer(brokers, c)

@@ -10,6 +10,7 @@ type AccessLogEntry struct {
 	Path         string  `json:"path"`
 	IP           string  `json:"ip"`
 	ResponseTime float64 `json:"response_time"`
+	At           string  `json:"at"`
 	TraceNo      string  `json:"traceno"`
 	Message      string  `json:"message"`
 
