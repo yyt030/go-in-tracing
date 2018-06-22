@@ -16,6 +16,7 @@ type Conf struct {
 	Topic               string   `json:"topic"`
 	MaxKafkaMsgLen      int      `json:"max_kafka_msg_len"`
 	MaxTracingMsgLen    int      `json:"max_tracing_msg_len"`
+	KafkaFlushFreq      int      `json:"kafka_flush_freq"`
 }
 
 // Read config file

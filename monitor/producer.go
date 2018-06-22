@@ -1,6 +1,10 @@
 package monitor
 
 import (
+	"errors"
+	"fmt"
+	"io"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"time"
@@ -17,6 +21,7 @@ type MockServer struct {
 	AccessLogProducer sarama.AsyncProducer
 	Server            http.Server
 	Tracer            opentracing.Tracer
+	Client            *http.Client
 }
 
 func (ms *MockServer) Close() error {
@@ -25,6 +30,29 @@ func (ms *MockServer) Close() error {
 	}
 
 	return nil
+}
+
+func (ms *MockServer) NewCliReq(sp opentracing.Span) ([]byte, error) {
+	// Create new request via http
+	req, err := http.NewRequest("GET", ms.Conf.RequestURL, nil)
+	if err != nil {
+		return nil, errors.New(fmt.Sprintf("create new request failed:%v", err))
+	}
+	// Inject the sp into request header
+	if err := sp.Tracer().Inject(sp.Context(), opentracing.TextMap, opentracing.HTTPHeadersCarrier(req.Header)); err != nil {
+		return nil, errors.New(fmt.Sprintf("sp inject error: %v", err))
+	}
+
+	//resp, err := http.DefaultClient.Do(req)
+	resp, err := ms.Client.Do(req)
+	if err != nil {
+		return nil, errors.New(fmt.Sprintf("request failed: %v", err))
+	}
+	defer resp.Body.Close()
+
+	io.Copy(ioutil.Discard, resp.Body)
+
+	return nil, err
 }
 
 func (ms *MockServer) WithAccessLog() http.Handler {
@@ -39,14 +67,14 @@ func (ms *MockServer) WithAccessLog() http.Handler {
 		sp.SetTag("traceNo", traceNo.String())
 
 		sp.LogKV("message", RandString(ms.Conf.MaxTracingMsgLen))
-		sp.LogKV("client_send", "AAA")
+		sp.LogKV("client_send", "test")
 		if ms.Conf.RequestURL != "" {
-			_, err := NewCliReq(ms.Conf, sp)
+			_, err := ms.NewCliReq(sp)
 			if err != nil {
 				log.Println("request service1 failed:", err)
 			}
 		}
-		sp.LogKV("client_receive", "AAA")
+		sp.LogKV("client_receive", "test")
 
 		entry := &AccessLogEntry{
 			Method:       r.Method,
@@ -71,13 +99,13 @@ func (ms *MockServer) WithAccessLog() http.Handler {
 	})
 }
 
-func NewAccessLogProducer(brokers []string) sarama.AsyncProducer {
+func NewAccessLogProducer(brokers []string, n int) sarama.AsyncProducer {
 	// For the access log, we are looking for AP semantics, with high throughput.
 	// By creating batches of compressed messages, we reduce network I/O at a cost of more latency.
 	c := sarama.NewConfig()
 	c.Producer.RequiredAcks = sarama.WaitForLocal       // Only wait for the leader to ack
 	c.Producer.Compression = sarama.CompressionSnappy   // Compress messages
-	c.Producer.Flush.Frequency = 500 * time.Millisecond // Flush batches every 500ms
+	c.Producer.Flush.Frequency = time.Duration(n) * time.Millisecond // Flush batches every 500ms
 
 	producer, err := sarama.NewAsyncProducer(brokers, c)
 	if err != nil {

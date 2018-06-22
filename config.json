@@ -6,5 +6,6 @@
   ],
   "topic": "monitor",
   "max_kafka_msg_len": 0,
-  "max_tracing_msg_len": 0
+  "max_tracing_msg_len": 0,
+  "kafka_flush_freq": 100
 }

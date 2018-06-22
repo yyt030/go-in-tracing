@@ -56,12 +56,18 @@ func main() {
 func NewMockServer(c config.Conf, addr string) *monitor.MockServer {
 	return &monitor.MockServer{
 		Conf:              c,
-		AccessLogProducer: monitor.NewAccessLogProducer(c.BrokerList),
+		AccessLogProducer: monitor.NewAccessLogProducer(c.BrokerList, c.KafkaFlushFreq),
 		Server: http.Server{
 			Addr:    addr,
 			Handler: nil,
 		},
 		Tracer: monitor.NewTracer(c.ZipkinEndPoint, addr),
+		Client: &http.Client{
+			Transport: &http.Transport{
+				MaxIdleConnsPerHost: c.MaxIdleConnsPerHost,
+				MaxIdleConns:        c.MaxIdleConnsPerHost * 2,
+			},
+		},
 	}
 }
 
@@ -70,9 +76,6 @@ func Run(ms *monitor.MockServer) error {
 
 	// Set tracer into default tracer
 	opentracing.InitGlobalTracer(ms.Tracer)
-
-	//server
-	http.DefaultTransport.(*http.Transport).MaxIdleConnsPerHost = ms.Conf.MaxIdleConnsPerHost
 
 	log.Printf("Listening for requests on %s...\n", ms.Server.Addr)
 	if ms.Conf.Profile {

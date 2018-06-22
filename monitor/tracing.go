@@ -1,15 +1,8 @@
 package monitor
 
 import (
-	"errors"
-	"fmt"
-	"io"
-	"io/ioutil"
 	"log"
 	"net/http"
-	"time"
-
-	"opentracing-zipkin-demo/config"
 
 	"github.com/opentracing/opentracing-go"
 	"github.com/openzipkin/zipkin-go-opentracing"
@@ -45,33 +38,4 @@ func NewSpan(r *http.Request) opentracing.Span {
 		sp = opentracing.StartSpan(opName, opentracing.ChildOf(ctx))
 	}
 	return sp
-}
-
-func NewCliReq(c config.Conf, sp opentracing.Span) ([]byte, error) {
-	// Create new request via http
-	tr := &http.Transport{
-		MaxIdleConnsPerHost: c.MaxIdleConnsPerHost,
-		IdleConnTimeout:     30 * time.Second,
-	}
-
-	req, err := http.NewRequest("GET", c.RequestURL, nil)
-	if err != nil {
-		return nil, errors.New(fmt.Sprintf("create new request failed:%v", err))
-	}
-	// Inject the sp into request header
-	if err := sp.Tracer().Inject(sp.Context(), opentracing.TextMap, opentracing.HTTPHeadersCarrier(req.Header)); err != nil {
-		return nil, errors.New(fmt.Sprintf("sp inject error: %v", err))
-	}
-
-	http.DefaultClient.Transport = tr
-	resp, err := http.DefaultClient.Do(req)
-
-	if err != nil {
-		return nil, errors.New(fmt.Sprintf("request failed: %v", err))
-	}
-	defer resp.Body.Close()
-
-	io.Copy(ioutil.Discard, resp.Body)
-
-	return nil, err
 }
