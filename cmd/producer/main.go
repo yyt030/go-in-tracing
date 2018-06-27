@@ -48,7 +48,7 @@ func main() {
 		}
 	}()
 
-	log.Printf("Kafka brokers: %s", conf.BrokerList)
+	log.Printf("Kafka brokers: %s", conf.KafkaBrokers)
 
 	log.Fatal(Run(ms))
 }
@@ -56,7 +56,7 @@ func main() {
 func NewMockServer(c config.Conf, addr string) *monitor.MockServer {
 	return &monitor.MockServer{
 		Conf:              c,
-		AccessLogProducer: monitor.NewAccessLogProducer(c.BrokerList, c.KafkaFlushFreq),
+		AccessLogProducer: monitor.NewAccessLogProducer(c.KafkaBrokers, c.KafkaFlushFreq),
 		Server: http.Server{
 			Addr:    addr,
 			Handler: nil,

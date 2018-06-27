@@ -8,15 +8,16 @@ import (
 )
 
 type Conf struct {
-	Profile             bool     `json:"profile"`
-	ZipkinEndPoint      string   `json:"zipkin_http_endpoint"`
-	RequestURL          string
-	MaxIdleConnsPerHost int      `json:"max_idle_conns_per_host"`
-	BrokerList          []string `json:"broker_list"`
-	Topic               string   `json:"topic"`
-	MaxKafkaMsgLen      int      `json:"max_kafka_msg_len"`
-	MaxTracingMsgLen    int      `json:"max_tracing_msg_len"`
-	KafkaFlushFreq      int      `json:"kafka_flush_freq"`
+	MaxIdleConnsPerHost int      `json:"http_max_idle_conns_per_host"`
+	ZipkinEndPoint      string   `json:"zipkin_endpoint"`
+	ZipkinMaxMsgLen     int      `json:"zipkin_max_msg_len"`
+	KafkaBrokers        []string `json:"kafka_brokers"`
+	KafkaTopic          string   `json:"kafka_topic"`
+	KafkaMaxMsgLen      int      `json:"kafka_max_msg_len"`
+	KafkaFlushFreq      int      `json:"kafka_flush_freq_ms"`
+
+	Profile    bool `json:"profile"`
+	RequestURL string
 }
 
 // Read config file
@@ -33,7 +34,7 @@ func ReadFile(filename string) (*Conf, error) {
 }
 
 func (c *Conf) VerifyConfig() error {
-	if c.BrokerList == nil {
+	if c.KafkaBrokers == nil {
 		return errors.New("BrokerList must config")
 	}
 	if c.ZipkinEndPoint == "" {

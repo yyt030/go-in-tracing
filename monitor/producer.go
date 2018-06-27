@@ -66,7 +66,7 @@ func (ms *MockServer) WithAccessLog() http.Handler {
 		sp.SetTag("status", "N")
 		sp.SetTag("traceNo", traceNo.String())
 
-		sp.LogKV("message", RandString(ms.Conf.MaxTracingMsgLen))
+		sp.LogKV("message", RandString(ms.Conf.ZipkinMaxMsgLen))
 		sp.LogKV("client_send", "test")
 		sp.LogKV("at", started.String())
 
@@ -88,14 +88,14 @@ func (ms *MockServer) WithAccessLog() http.Handler {
 			At2:          "!!!",
 			At3:          "@@@",
 			TraceNo:      traceNo.String(),
-			Message:      RandString(ms.Conf.MaxKafkaMsgLen),
+			Message:      RandString(ms.Conf.KafkaMaxMsgLen),
 		}
 
 		// We will use the client's IP address as key. This will cause
 		// all the access log entries of the same IP address to end up
 		// on the same partition.
 		ms.AccessLogProducer.Input() <- &sarama.ProducerMessage{
-			Topic: ms.Conf.Topic,
+			Topic: ms.Conf.KafkaTopic,
 			Key:   sarama.StringEncoder(r.RemoteAddr),
 			Value: entry,
 		}

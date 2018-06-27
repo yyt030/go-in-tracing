@@ -13,6 +13,12 @@
   revision = "5785279e2e809f6c56dbbe0eb41d13fb17c88bdd"
 
 [[projects]]
+  name = "github.com/bsm/sarama-cluster"
+  packages = ["."]
+  revision = "cf455bc755fe41ac9bb2861e7a961833d9c2ecc3"
+  version = "v2.1.13"
+
+[[projects]]
   name = "github.com/davecgh/go-spew"
   packages = ["spew"]
   revision = "346938d642f2ec3594ed81d874461961cd0faa76"
@@ -62,6 +68,27 @@
 
 [[projects]]
   branch = "master"
+  name = "github.com/mailru/easyjson"
+  packages = [
+    ".",
+    "buffer",
+    "jlexer",
+    "jwriter"
+  ]
+  revision = "3fdea8d05856a0c8df22ed4bc71b3219245e4485"
+
+[[projects]]
+  name = "github.com/olivere/elastic"
+  packages = [
+    ".",
+    "config",
+    "uritemplates"
+  ]
+  revision = "dabcc5de0a3fd6313870c223c3119e2b1e942ba3"
+  version = "v6.1.23"
+
+[[projects]]
+  branch = "master"
   name = "github.com/opentracing-contrib/go-observer"
   packages = ["."]
   revision = "a52f2342449246d5bcc273e65cbdcfa5f7d6c63c"
@@ -99,6 +126,12 @@
   version = "v2.0.2"
 
 [[projects]]
+  name = "github.com/pkg/errors"
+  packages = ["."]
+  revision = "645ef00459ed84a119197bfb8d8205042c6df63d"
+  version = "v0.8.0"
+
+[[projects]]
   branch = "master"
   name = "github.com/rcrowley/go-metrics"
   packages = ["."]
@@ -119,6 +152,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "4699c192bde18c1b3782db1335f2099001e38cd9add7d2c42bdb8d649f93244d"
+  inputs-digest = "9b3463a268e8ddafc3f1593691b869b8f49ef6917acb41f411cc3ecfb46c3078"
   solver-name = "gps-cdcl"
   solver-version = 1

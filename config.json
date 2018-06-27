@@ -1,11 +1,11 @@
 {
-  "zipkin_http_endpoint": "http://localhost:9411/api/v1/spans",
-  "max_idle_conns_per_host": 200,
-  "broker_list": [
+  "http_max_idle_conns_per_host": 200,
+  "zipkin_endpoint": "http://localhost:9411/api/v1/spans",
+  "zipkin_max_msg_len": 0,
+  "kafka_brokers": [
     "localhost:9092"
   ],
-  "topic": "monitor",
-  "max_kafka_msg_len": 0,
-  "max_tracing_msg_len": 0,
-  "kafka_flush_freq": 100
+  "kafka_topic": "monitor",
+  "kafka_max_msg_len": 0,
+  "kafka_flush_freq_ms": 100
 }
