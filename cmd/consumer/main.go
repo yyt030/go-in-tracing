@@ -1,15 +1,20 @@
 package main
 
 import (
+	"context"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"log"
 	"os"
 	"os/signal"
+	"time"
 
 	"opentracing-zipkin-demo/config"
+	"opentracing-zipkin-demo/monitor"
 
 	"github.com/bsm/sarama-cluster"
+	"github.com/olivere/elastic"
 )
 
 var (
@@ -38,6 +43,9 @@ func main() {
 	c := cluster.NewConfig()
 	c.Consumer.Return.Errors = true
 	c.Group.Return.Notifications = true
+	c.ChannelBufferSize = 2048
+	c.Net.KeepAlive = 300
+	c.Net.MaxOpenRequests = 256
 
 	// init consumer
 	consumer, err := cluster.NewConsumer(conf.KafkaBrokers, "my-consumer-group", []string{conf.KafkaTopic}, c)
@@ -64,12 +72,48 @@ func main() {
 		}
 	}()
 
+	// elasticsearch insert
+	opts := []elastic.ClientOptionFunc{
+		elastic.SetSniff(false),
+		elastic.SetURL(conf.ESEndPoint...),
+	}
+
+	cli, err := elastic.NewClient(opts...)
+	if err != nil {
+		panic(err)
+	}
+	defer cli.Stop()
+
+	ctx := context.Background()
+	defer ctx.Done()
+
+	p, err := cli.BulkProcessor().
+		Workers(conf.ESWorkers).
+		BulkActions(conf.ESBulkActions).
+		BulkSize(conf.ESBulkSize).
+		FlushInterval(time.Duration(conf.ESFlushInterval) * time.Second).Do(ctx)
+
+	if err != nil {
+		panic(err)
+	}
+	defer p.Close()
+
 	// consume messages, watch signals
 	for {
 		select {
 		case msg, ok := <-consumer.Messages():
 			if ok {
-				fmt.Fprintf(os.Stdout, "%s/%d/%d\t%s\t%s\n", msg.Topic, msg.Partition, msg.Offset, msg.Key, msg.Value)
+				acLog := new(monitor.AccessLogEntry)
+				if err := json.Unmarshal(msg.Value, acLog); err != nil {
+					fmt.Println(err)
+					consumer.MarkOffset(msg, "")
+					break
+				}
+
+				r := elastic.NewBulkIndexRequest().Index(conf.KafkaTopic).Type("doc").Doc(acLog)
+				p.Add(r)
+
+				//fmt.Fprintf(os.Stdout, "%s/%d/%d\t%s\t%s\n", msg.Topic, msg.Partition, msg.Offset, msg.Key, msg.Value)
 				consumer.MarkOffset(msg, "") // mark message as processed
 			}
 		case <-signals:
