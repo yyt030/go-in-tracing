@@ -4,10 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"flag"
-	"fmt"
 	"log"
 	"os"
 	"os/signal"
+	"sync"
 	"time"
 
 	"opentracing-zipkin-demo/config"
@@ -21,24 +21,73 @@ var (
 	cf = flag.String("conf", "config.json", "config file name")
 )
 
+type MonitorConsumer struct {
+	consumer *cluster.Consumer
+	cli      *elastic.Client
+	bp       *elastic.BulkProcessor
+
+	sign chan os.Signal
+	//conf config.Conf
+}
+
+const indexMapping = `
+{
+  "settings": {
+    "number_of_shards": 1,
+    "number_of_replicas": 0,
+	"refresh_interval":"5s",
+	"translog.durability":"async",
+	"translog.flush_threshold_size": "512m"
+  },
+  "mappings": {
+    "doc": {
+      "properties": {
+        "@timestamp": {
+          "type": "date",
+          "format": "dateOptionalTime"
+        },
+        "method": {
+          "type": "text"
+        },
+        "host": {
+          "type": "text"
+        },
+        "path": {
+          "type": "text"
+        },
+        "ip": {
+          "type": "text"
+        },
+        "response_time": {
+          "type": "text"
+        },
+        "at": {
+          "type": "text"
+        },
+        "at2": {
+          "type": "text"
+        },
+        "at3": {
+          "type": "text"
+        },
+        "traceno": {
+          "type": "text"
+        },
+        "message": {
+          "type": "text"
+        }
+      }
+    }
+  }
+}
+`
+
 func init() {
 	log.SetFlags(log.Ldate | log.Ltime | log.Lmicroseconds | log.Lshortfile)
 }
 
-func main() {
-	flag.Parse()
-
-	conf, err := config.ReadFile(*cf)
-	if err != nil {
-		flag.PrintDefaults()
-		log.Fatal("read config file failed:", err)
-	}
-
-	if err = conf.VerifyConfig(); err != nil {
-		flag.PrintDefaults()
-		log.Fatal(err)
-	}
-
+func NewConsumer(conf config.Conf) *MonitorConsumer {
+	// -----------------------------------------------------------
 	// init (custom) config, enable errors and notifications
 	c := cluster.NewConfig()
 	c.Consumer.Return.Errors = true
@@ -52,11 +101,6 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	defer consumer.Close()
-
-	// trap SIGINT to trigger a shutdown.
-	signals := make(chan os.Signal, 1)
-	signal.Notify(signals, os.Interrupt)
 
 	// consume errors
 	go func() {
@@ -72,6 +116,12 @@ func main() {
 		}
 	}()
 
+	// -----------------------------------------------------------
+	// trap SIGINT to trigger a shutdown.
+	signals := make(chan os.Signal, 1)
+	signal.Notify(signals, os.Interrupt)
+
+	// -----------------------------------------------------------
 	// elasticsearch insert
 	opts := []elastic.ClientOptionFunc{
 		elastic.SetSniff(false),
@@ -82,42 +132,113 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	defer cli.Stop()
 
-	ctx := context.Background()
-	defer ctx.Done()
-
-	p, err := cli.BulkProcessor().
+	bp, err := cli.BulkProcessor().
 		Workers(conf.ESWorkers).
 		BulkActions(conf.ESBulkActions).
 		BulkSize(conf.ESBulkSize).
-		FlushInterval(time.Duration(conf.ESFlushInterval) * time.Second).Do(ctx)
+		FlushInterval(time.Duration(conf.ESFlushInterval) * time.Second).Do(context.Background())
 
 	if err != nil {
 		panic(err)
 	}
-	defer p.Close()
+
+	// -----------------------------------------------------------
+	// return MonitorConsumer
+	return &MonitorConsumer{
+		consumer: consumer,
+		cli:      cli,
+		bp:       bp,
+		sign:     signals,
+	}
+}
+
+func (mc *MonitorConsumer) IndexExists(indexName string) error {
+	// Use the IndexExists service to check if a specified index exists.
+	exists, err := mc.cli.IndexExists(indexName).Do(context.Background())
+	if err != nil {
+		return err
+	}
+	if !exists {
+		// Create a new index.
+		createIndex, err := mc.cli.CreateIndex(indexName).BodyString(indexMapping).Do(context.Background())
+		if err != nil {
+			// Handle error
+			return err
+		}
+		if !createIndex.Acknowledged {
+			// Not acknowledged
+		}
+	}
+
+	return nil
+}
+
+func (mc *MonitorConsumer) Run(conf config.Conf) {
+	log.Println(">>> kafka consumer worker staring ...")
+	// check elastic index
+	if err := mc.IndexExists(conf.KafkaTopic); err != nil {
+		log.Println(err)
+	}
 
 	// consume messages, watch signals
 	for {
 		select {
-		case msg, ok := <-consumer.Messages():
+		case msg, ok := <-mc.consumer.Messages():
 			if ok {
 				acLog := new(monitor.AccessLogEntry)
 				if err := json.Unmarshal(msg.Value, acLog); err != nil {
-					fmt.Println(err)
-					consumer.MarkOffset(msg, "")
+					log.Println(err)
+					mc.consumer.MarkOffset(msg, "")
 					break
 				}
 
 				r := elastic.NewBulkIndexRequest().Index(conf.KafkaTopic).Type("doc").Doc(acLog)
-				p.Add(r)
+				mc.bp.Add(r)
 
-				//fmt.Fprintf(os.Stdout, "%s/%d/%d\t%s\t%s\n", msg.Topic, msg.Partition, msg.Offset, msg.Key, msg.Value)
-				consumer.MarkOffset(msg, "") // mark message as processed
+				mc.consumer.MarkOffset(msg, "") // mark message as processed
 			}
-		case <-signals:
+		case <-mc.sign:
+			log.Println("Byebye, I will come back!!!")
 			return
 		}
 	}
+}
+
+func (mc *MonitorConsumer) Finished() {
+	defer mc.bp.Close()
+	defer mc.cli.Stop()
+	defer mc.consumer.Close()
+}
+
+func CreateWorker(c config.Conf) {
+	log.Printf(">>> create workers:%d, %+v", c.KafkaWorkersNum, c)
+	var wg sync.WaitGroup
+	wg.Add(c.KafkaWorkersNum)
+	for i := 0; i < c.KafkaWorkersNum; i++ {
+		mc := NewConsumer(c)
+		go func() {
+			mc.Run(c)
+			mc.Finished()
+			wg.Done()
+		}()
+	}
+	wg.Wait()
+}
+
+func main() {
+	flag.Parse()
+
+	c, err := config.ReadFile(*cf)
+	if err != nil {
+		flag.PrintDefaults()
+		log.Fatal("read config file failed:", err)
+	}
+
+	if err = c.VerifyConfig(); err != nil {
+		flag.PrintDefaults()
+		log.Fatal(err)
+	}
+
+	CreateWorker(*c)
 }

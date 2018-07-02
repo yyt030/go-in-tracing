@@ -2,6 +2,7 @@
   "http_max_idle_conns_per_host": 200,
   "zipkin_endpoint": "http://localhost:9411/api/v1/spans",
   "zipkin_max_msg_len": 10,
+  "kafka_workers_num": 3,
   "kafka_brokers": [
     "localhost:9092"
   ],
