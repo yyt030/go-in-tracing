@@ -7,8 +7,8 @@ import (
 	"log"
 	"sync"
 
-	"opentracing-zipkin-demo/config"
-	"opentracing-zipkin-demo/monitor"
+	"go-in-tracing/config"
+	"go-in-tracing/monitor"
 
 	"github.com/olivere/elastic"
 )

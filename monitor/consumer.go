@@ -8,7 +8,7 @@ import (
 	"os/signal"
 	"time"
 
-	"opentracing-zipkin-demo/config"
+	"go-in-tracing/config"
 
 	"github.com/bsm/sarama-cluster"
 	"github.com/olivere/elastic"

@@ -6,8 +6,8 @@ import (
 	"net/http"
 	_ "net/http/pprof"
 
-	"opentracing-zipkin-demo/config"
-	"opentracing-zipkin-demo/monitor"
+	"go-in-tracing/config"
+	"go-in-tracing/monitor"
 
 	"github.com/opentracing/opentracing-go"
 )

@@ -9,7 +9,7 @@ import (
 	"net/http"
 	"time"
 
-	"opentracing-zipkin-demo/config"
+	"go-in-tracing/config"
 
 	"github.com/Shopify/sarama"
 	"github.com/opentracing/opentracing-go"
