@@ -2,7 +2,8 @@
 
 export GOOS=linux
 export OSARCH=amd64
+versionId=`git describe --always --long`
 
-go build cmd/consumer/main.go
+go build -o consumer.$versionId cmd/consumer/main.go
 
 
