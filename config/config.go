@@ -39,6 +39,7 @@ func ReadFile(filename string) (*Conf, error) {
 	if err := json.Unmarshal(text, cf); err != nil {
 		return nil, err
 	}
+
 	return cf, nil
 }
 
